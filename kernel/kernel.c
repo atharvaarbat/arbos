@@ -3,42 +3,42 @@
 #include "../include/memory.h"
 #include "../include/pmm.h"
 #include "../include/paging.h"
-
-extern void idt_setup(); // sanity
+// #include "../include/gdt.h"
+#include "../include/process.h"
+#include "../include/syscall.h"
+extern void task_a();
+extern void task_b();
+void test_syscall_task(void);
 
 void kmain() {
     vga_clear();
     vga_puts("Kernel: initializing...\n");
 
-    // init PMM
     pmm_init();
-
-    // enable paging
     paging_init();
-
-    // print PMM stats
-    char b[64];
-    vga_puts("PMM pages total: ");
-    // crude print of numbers (no printf)
-    // We'll print free pages by polling pmm_free_pages
-    uint32_t free = pmm_free_pages();
-    // print free as hex:
-    vga_puts("free pages: 0x");
-    // print 8 hex digits
-    const char *hex = "0123456789ABCDEF";
-    for (int i = 7; i >= 0; --i) {
-        uint8_t nib = (free >> (i*4)) & 0xF;
-        vga_putc(hex[nib]);
-    }
-    vga_putc('\n');
-
-    // initialize timer at 100Hz
     init_timer(100);
-    vga_puts("Timer initialized.\n");
+    // gdt_install(); /* if you have GDT from milestone 2 */
 
-    vga_puts("Type on keyboard (basic mapping).\n");
+    vga_puts("Scheduler init...\n");
+    scheduler_init();
 
-    for(;;) {
-        __asm__ volatile ("hlt");
-    }
+    // create two tasks
+    int pid1 = task_create(task_a);
+    int pid2 = task_create(task_b);
+    // int pid3 = task_create(test_syscall_task);
+    test_syscall_task(); // directly call for testing
+    vga_puts("Created tasks. Starting scheduler...\n");
+    scheduler_start();
+
+    // If scheduler returns, halt
+    for (;;) { __asm__ volatile ("hlt"); }
+}
+
+
+
+
+void test_syscall_task(void) {
+    const char msg[] = "Hello from sys_write!\n";
+    sys_write(msg, sizeof(msg)-1);
+    for (;;) { __asm__ volatile ("hlt"); }
 }
